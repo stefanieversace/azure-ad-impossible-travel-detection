@@ -1,0 +1,19 @@
+let timeframe = 24h;
+SigninLogs
+| where TimeGenerated > ago(timeframe)
+| where ResultType == 0
+| project UserPrincipalName, IPAddress, Location, TimeGenerated
+| extend Country = tostring(Location.countryOrRegion)
+| sort by UserPrincipalName asc, TimeGenerated asc
+| serialize
+| extend PrevTime = prev(TimeGenerated), PrevCountry = prev(Country), PrevUser = prev(UserPrincipalName)
+| where UserPrincipalName == PrevUser
+| extend TimeDiff = datetime_diff("minute", TimeGenerated, PrevTime)
+| where PrevCountry != Country and TimeDiff < 120
+| extend Severity = case(
+    TimeDiff < 30, "High",
+    TimeDiff < 60, "Medium",
+    "Low"
+)
+| project TimeGenerated, UserPrincipalName, IPAddress, PrevCountry, Country, TimeDiff, Severity
+| order by TimeDiff asc
